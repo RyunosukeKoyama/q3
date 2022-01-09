@@ -6,12 +6,14 @@ using UnityEngine.Networking;
 
 public class MasterLoader : MonoSingleton<MasterLoader>
 {
-    private const string URL = "https://script.google.com/macros/s/AKfycbxyMJtn9rQjNfp3Am4NEL2lS5GdXoUPfkUJRHAdUEOdvCp25bweKo2Zj5R3h9IKmbYI/exec";
+    private const string URL = "https://script.google.com/macros/s/AKfycbzNr5XQwIIpGb8JEQ719wp_9W_4I5KOnncUSvo4hdYcYU0byzi260I27kGlupFLmefo/exec";
 
     public IEnumerator GetMaster()
     {
         UnityWebRequest webRequest = UnityWebRequest.Get(URL);
         yield return webRequest.SendWebRequest();
+
+        Debug.Log(webRequest.result);
 
         switch (webRequest.result)
         {
@@ -32,6 +34,7 @@ public class MasterLoader : MonoSingleton<MasterLoader>
         yield return coroutine;
 
         var json = (string)ie.Current;
+        Debug.Log(json);
         var quizArray = JsonUtility.FromJson<QuizArray>("{\"quizzes\":" + json + "}");
         yield return quizArray.quizzes.ToList();
     }

@@ -16,6 +16,7 @@ public class QuizManager : MonoBehaviour
     [SerializeField] private Transform explanationParent;
     private TextMeshProUGUI explanationGUI;
     [SerializeField] private Transform resultParent;
+    [SerializeField] private Transform loadingParent;
 
     private List<Quiz> remainingQuizzes;
     private Quiz currentQuiz;
@@ -24,7 +25,8 @@ public class QuizManager : MonoBehaviour
 
     private IEnumerator Start()
     {
-        explanationParent.GetComponent<Button>().onClick.AddListener(FinishQuiz);
+        StartCoroutine(Loading.I.ShowLoading());
+        Debug.Log("start");
 
         var ie = MasterLoader.I.LoadQuizzes();
         var coroutine = StartCoroutine(ie);
@@ -34,7 +36,10 @@ public class QuizManager : MonoBehaviour
         loadedQuizzes = (List<Quiz>)ie.Current;
         remainingQuizzes = new List<Quiz>(loadedQuizzes);
 
+        ShowQuestion();
         StartQuiz();
+
+        loadingParent.gameObject.SetActive(false);
     }
 
     public void Restart()
@@ -44,6 +49,7 @@ public class QuizManager : MonoBehaviour
         remainingQuizzes = new List<Quiz>(loadedQuizzes);
         correctQuizzes.Clear();
 
+        ShowQuestion();
         StartQuiz();
     }
 
@@ -60,7 +66,7 @@ public class QuizManager : MonoBehaviour
         HideAnswer();
     }
 
-    private void FinishQuiz()
+    public void FinishQuiz()
     {
         if (remainingQuizzes.Count > 0)
         {
@@ -70,6 +76,11 @@ public class QuizManager : MonoBehaviour
         {
             ShowResult();
         }
+    }
+
+    private void ShowQuestion()
+    {
+        questionParent.gameObject.SetActive(true);
     }
 
     private void ShowChoices()
@@ -122,8 +133,6 @@ public class QuizManager : MonoBehaviour
 
     private void HideResult()
     {
-        questionParent.gameObject.SetActive(true);
-        explanationParent.gameObject.SetActive(true);
         resultParent.gameObject.SetActive(false);
     }
 
