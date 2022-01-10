@@ -326,7 +326,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Quiz Start
+  m_text: Quiz Stqrt
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ee5d429c0f4c24ebfa5c6adf54e83359, type: 2}
   m_sharedMaterial: {fileID: 3801681352951888184, guid: ee5d429c0f4c24ebfa5c6adf54e83359, type: 2}
