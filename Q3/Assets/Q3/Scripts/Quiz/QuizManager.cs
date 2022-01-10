@@ -16,7 +16,6 @@ public class QuizManager : MonoBehaviour
     [SerializeField] private Transform explanationParent;
     private TextMeshProUGUI explanationGUI;
     [SerializeField] private Transform resultParent;
-    [SerializeField] private Transform loadingParent;
 
     private List<Quiz> remainingQuizzes;
     private Quiz currentQuiz;
@@ -25,7 +24,7 @@ public class QuizManager : MonoBehaviour
 
     private IEnumerator Start()
     {
-        StartCoroutine(Loading.I.ShowLoading());
+        StartCoroutine(ModalManager.I.GenerateLoading());
         Debug.Log("start");
 
         var ie = MasterLoader.I.LoadQuizzes();
@@ -39,7 +38,7 @@ public class QuizManager : MonoBehaviour
         ShowQuestion();
         StartQuiz();
 
-        loadingParent.gameObject.SetActive(false);
+        ModalManager.I.DeleteModal();
     }
 
     public void Restart()

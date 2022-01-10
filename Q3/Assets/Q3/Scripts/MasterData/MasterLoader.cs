@@ -10,6 +10,7 @@ public class MasterLoader : MonoSingleton<MasterLoader>
 
     public IEnumerator GetMaster()
     {
+        Debug.Log("Request Start");
         UnityWebRequest webRequest = UnityWebRequest.Get(URL);
         yield return webRequest.SendWebRequest();
 
