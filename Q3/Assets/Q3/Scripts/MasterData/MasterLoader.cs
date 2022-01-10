@@ -6,7 +6,7 @@ using UnityEngine.Networking;
 
 public class MasterLoader : MonoSingleton<MasterLoader>
 {
-    private const string URL = "https://script.google.com/macros/s/AKfycbzNr5XQwIIpGb8JEQ719wp_9W_4I5KOnncUSvo4hdYcYU0byzi260I27kGlupFLmefo/exec";
+    private const string URL = "https://script.google.com/macros/s/AKfycbwdTpgIjD9ENIDpSVNeiT--VHIRNJQTBnzdKRFl7_7X_n8mrFhYNYQ4SEiZnzbQSqgN/exec";
 
     public IEnumerator GetMaster()
     {
