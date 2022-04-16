@@ -20,7 +20,7 @@ public class QuizManager : MonoBehaviour
     private List<Quiz> remainingQuizzes;
     private Quiz currentQuiz;
     private List<Quiz> correctQuizzes = new List<Quiz>();
-    private List<Quiz> loadedQuizzes;
+    private List<Quiz> selectedQuizzes;
 
     private IEnumerator Start()
     {
@@ -32,8 +32,9 @@ public class QuizManager : MonoBehaviour
 
         yield return coroutine;
 
-        loadedQuizzes = (List<Quiz>)ie.Current;
-        remainingQuizzes = new List<Quiz>(loadedQuizzes);
+        var allQuizzes = (List<Quiz>)ie.Current;
+        selectedQuizzes = allQuizzes.Take(QuizParam.GetQuantity()).ToList();
+        remainingQuizzes = new List<Quiz>(selectedQuizzes);
 
         ShowQuestion();
         StartQuiz();
@@ -45,7 +46,7 @@ public class QuizManager : MonoBehaviour
     {
         HideResult();
 
-        remainingQuizzes = new List<Quiz>(loadedQuizzes);
+        remainingQuizzes = new List<Quiz>(selectedQuizzes);
         correctQuizzes.Clear();
 
         ShowQuestion();
@@ -101,7 +102,7 @@ public class QuizManager : MonoBehaviour
         resultParent.gameObject.SetActive(true);
 
         var gui = resultParent.Find("CorrectCount").GetComponentInChildren<TextMeshProUGUI>();
-        gui.text = $"正解数\n<mark><size=150>{correctQuizzes.Count}/{loadedQuizzes.Count} </size></mark>";
+        gui.text = $"正解数\n<mark><size=150>{correctQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
     }
 
     private void SetQuestion(string question)
