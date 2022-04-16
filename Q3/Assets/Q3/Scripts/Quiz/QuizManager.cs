@@ -16,10 +16,12 @@ public class QuizManager : MonoBehaviour
     [SerializeField] private Transform explanationParent;
     private TextMeshProUGUI explanationGUI;
     [SerializeField] private Transform resultParent;
+    [SerializeField] private GameObject restartOnlyIncorrect;
+
 
     private List<Quiz> remainingQuizzes;
     private Quiz currentQuiz;
-    private List<Quiz> correctQuizzes = new List<Quiz>();
+    private List<Quiz> incorrectQuizzes = new List<Quiz>();
     private List<Quiz> selectedQuizzes;
 
     private IEnumerator Start()
@@ -42,12 +44,12 @@ public class QuizManager : MonoBehaviour
         ModalManager.I.DeleteModal();
     }
 
-    public void Restart()
+    public void Restart(bool onlyIncorrect = false)
     {
         HideResult();
 
-        remainingQuizzes = new List<Quiz>(selectedQuizzes);
-        correctQuizzes.Clear();
+        remainingQuizzes = onlyIncorrect ? new List<Quiz>(incorrectQuizzes) : new List<Quiz>(selectedQuizzes);
+        incorrectQuizzes.Clear();
 
         ShowQuestion();
         StartQuiz();
@@ -100,9 +102,11 @@ public class QuizManager : MonoBehaviour
         questionParent.gameObject.SetActive(false);
         explanationParent.gameObject.SetActive(false);
         resultParent.gameObject.SetActive(true);
+        var isIncorrect = incorrectQuizzes.Count > 0;
+        restartOnlyIncorrect.SetActive(isIncorrect);
 
         var gui = resultParent.Find("CorrectCount").GetComponentInChildren<TextMeshProUGUI>();
-        gui.text = $"正解数\n<mark><size=150>{correctQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
+        gui.text = $"正解数\n<mark><size=150>{selectedQuizzes.Count - incorrectQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
     }
 
     private void SetQuestion(string question)
@@ -158,11 +162,11 @@ public class QuizManager : MonoBehaviour
         if (currentQuiz.CorrectChoiceIndex == choiceNum)
         {
             correctAnswer.SetActive(true);
-            correctQuizzes.Add(currentQuiz);
         }
         else
         {
             incorrectAnswer.SetActive(true);
+            incorrectQuizzes.Add(currentQuiz);
         }
 
         remainingQuizzes.Remove(currentQuiz);
