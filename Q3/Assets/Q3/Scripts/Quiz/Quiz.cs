@@ -9,7 +9,7 @@ public class Quiz
     public string Question = "NO DATA";
     public string[] Choices;
     public int CorrectChoiceIndex;
-    public string Explanation = "NO DATA";
+    public string[] Explanations;
 }
 
 [Serializable]

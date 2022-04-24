@@ -115,10 +115,10 @@ public class QuizManager : MonoBehaviour
         questionGUI.text = question;
     }
 
-    private void SetExplanation()
+    private void SetExplanation(int choiceNum)
     {
         explanationGUI ??= explanationParent.GetComponentInChildren<TextMeshProUGUI>();
-        explanationGUI.text = currentQuiz.Explanation;
+        explanationGUI.text = currentQuiz.Explanations[choiceNum];
     }
 
     private void ClearChoices()
@@ -156,7 +156,7 @@ public class QuizManager : MonoBehaviour
 
     private void ChooceChoice(int choiceNum)
     {
-        SetExplanation();
+        SetExplanation(choiceNum);
         ShowExplanation();
 
         if (currentQuiz.CorrectChoiceIndex == choiceNum)
