@@ -4,6 +4,7 @@ using System;
 public class Quiz
 {
     public int Id;
+    public string Section = "NO DATA";
     public string Question = "NO DATA";
     public string[] Choices;
     public int CorrectChoiceIndex;

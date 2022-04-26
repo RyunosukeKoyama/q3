@@ -7,6 +7,8 @@ using System.Collections;
 
 public class QuizManager : MonoBehaviour
 {
+    [SerializeField] private Transform sectionParent;
+    private TextMeshProUGUI sectionGUI;
     [SerializeField] private Transform questionParent;
     private TextMeshProUGUI questionGUI;
     [SerializeField] private Transform choicesParent;
@@ -38,7 +40,6 @@ public class QuizManager : MonoBehaviour
         selectedQuizzes = allQuizzes.Take(QuizParam.GetQuantity()).ToList();
         remainingQuizzes = new List<Quiz>(selectedQuizzes);
 
-        ShowQuestion();
         StartQuiz();
 
         ModalManager.I.DeleteModal();
@@ -51,7 +52,6 @@ public class QuizManager : MonoBehaviour
         remainingQuizzes = onlyIncorrect ? new List<Quiz>(incorrectQuizzes) : new List<Quiz>(selectedQuizzes);
         incorrectQuizzes.Clear();
 
-        ShowQuestion();
         StartQuiz();
     }
 
@@ -59,7 +59,11 @@ public class QuizManager : MonoBehaviour
     {
         currentQuiz = remainingQuizzes.First();
 
+        SetSection(currentQuiz.Section);
+        ShowSection();
+
         SetQuestion(currentQuiz.Question);
+        ShowQuestion();
 
         ClearChoices();
         GenerateChoices(currentQuiz.Choices);
@@ -78,6 +82,11 @@ public class QuizManager : MonoBehaviour
         {
             ShowResult();
         }
+    }
+
+    private void ShowSection()
+    {
+        sectionParent.gameObject.SetActive(true);
     }
 
     private void ShowQuestion()
@@ -99,6 +108,7 @@ public class QuizManager : MonoBehaviour
 
     private void ShowResult()
     {
+        sectionParent.gameObject.SetActive(false);
         questionParent.gameObject.SetActive(false);
         explanationParent.gameObject.SetActive(false);
         resultParent.gameObject.SetActive(true);
@@ -107,6 +117,12 @@ public class QuizManager : MonoBehaviour
 
         var gui = resultParent.Find("CorrectCount").GetComponentInChildren<TextMeshProUGUI>();
         gui.text = $"正解数\n<mark><size=150>{selectedQuizzes.Count - incorrectQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
+    }
+
+    private void SetSection(string section)
+    {
+        sectionGUI ??= sectionParent.GetComponentInChildren<TextMeshProUGUI>();
+        sectionGUI.text = section;
     }
 
     private void SetQuestion(string question)
