@@ -16,6 +16,6 @@ public class QuizQuantitySelector : MonoBehaviour
 
     public void OnClicked(int index)
     {
-        QuizParam.SetQuantity(int.Parse(dropdown.options[index].text));
+        QuizParam.SetQuantity(QuizParam.QuantityChoices[index]);
     }
 }

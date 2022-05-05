@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
@@ -37,7 +38,17 @@ public class QuizManager : MonoBehaviour
         yield return coroutine;
 
         var allQuizzes = (List<Quiz>)ie.Current;
-        selectedQuizzes = allQuizzes.Take(QuizParam.GetQuantity()).ToList();
+
+        selectedQuizzes = allQuizzes
+                            .Where(q =>
+                            {
+                                var chapter = QuizParam.GetChapter();
+                                return chapter == 0 || q.Chapter == chapter; // 0なら全て
+                            })
+                            .OrderBy(_ => Guid.NewGuid())
+                            .Take(QuizParam.GetQuantity())
+                            .ToList();
+
         remainingQuizzes = new List<Quiz>(selectedQuizzes);
 
         StartQuiz();
