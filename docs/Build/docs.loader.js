@@ -46,7 +46,7 @@ function createUnityInstance(canvas, config, onProgress) {
       preserveDrawingBuffer: false,
     },
     cacheControl: function (url) {
-      return url == Module.dataUrl ? "must-revalidate" : "no-store";
+      return (url == Module.dataUrl || url.match(/\.bundle/)) ? "must-revalidate" : "no-store";
     },
     streamingAssetsUrl: "StreamingAssets",
     downloadProgress: {},
@@ -110,34 +110,6 @@ function createUnityInstance(canvas, config, onProgress) {
   window.addEventListener("error", errorListener);
   window.addEventListener("unhandledrejection", errorListener);
 
-  // Clear the event handlers we added above when the app quits, so that the event handler
-  // functions will not hold references to this JS function scope after
-  // exit, to allow JS garbage collection to take place.
-  Module.deinitializers.push(function() {
-    Module['disableAccessToMediaDevices']();
-    disabledCanvasEvents.forEach(function (disabledCanvasEvent) {
-      canvas.removeEventListener(disabledCanvasEvent, preventDefault);
-    });
-    window.removeEventListener("error", errorListener);
-    window.removeEventListener("unhandledrejection", errorListener);
-
-    for (var id in Module.intervals)
-    {
-      window.clearInterval(id);
-    }
-    Module.intervals = {};
-  });
-
-  Module.QuitCleanup = function () {
-    for (var i = 0; i < Module.deinitializers.length; i++) {
-      Module.deinitializers[i]();
-    }
-    Module.deinitializers = [];
-    // After all deinitializer callbacks are called, notify user code that the Unity game instance has now shut down.
-    if (typeof Module.onQuit == "function")
-      Module.onQuit();
-    };
-
   // Safari does not automatically stretch the fullscreen element to fill the screen.
   // The CSS width/height of the canvas causes it to remain the same size in the full screen
   // window on Safari, resulting in it being a small canvas with black borders filling the
@@ -164,6 +136,35 @@ function createUnityInstance(canvas, config, onProgress) {
       }
     }
   });
+
+  // Clear the event handlers we added above when the app quits, so that the event handler
+  // functions will not hold references to this JS function scope after
+  // exit, to allow JS garbage collection to take place.
+  Module.deinitializers.push(function() {
+    Module['disableAccessToMediaDevices']();
+    disabledCanvasEvents.forEach(function (disabledCanvasEvent) {
+      canvas.removeEventListener(disabledCanvasEvent, preventDefault);
+    });
+    window.removeEventListener("error", errorListener);
+    window.removeEventListener("unhandledrejection", errorListener);
+
+    for (var id in Module.intervals)
+    {
+      window.clearInterval(id);
+    }
+    Module.intervals = {};
+  });
+
+  Module.QuitCleanup = function () {
+    for (var i = 0; i < Module.deinitializers.length; i++) {
+      Module.deinitializers[i]();
+    }
+    Module.deinitializers = [];
+    // After all deinitializer callbacks are called, notify user code that the Unity game instance has now shut down.
+    if (typeof Module.onQuit == "function")
+      Module.onQuit();
+
+  };
 
   var unityInstance = {
     Module: Module,
@@ -369,7 +370,7 @@ function createUnityInstance(canvas, config, onProgress) {
     onProgress(0.9 * totalProgress);
   }
 
-Module.fetchWithProgress = function () {
+Module.readBodyWithProgress = function() {
   /**
    * Estimate length of uncompressed content by taking average compression ratios
    * of compression type into account.
@@ -396,7 +397,101 @@ Module.fetchWithProgress = function () {
     }
   }
 
+  function readBodyWithProgress(response, onProgress) {
+    var reader = response.body ? response.body.getReader() : undefined;
+    var lengthComputable = typeof response.headers.get('Content-Length') !== "undefined";
+    var estimatedContentLength = estimateContentLength(response, lengthComputable);
+    var body = new Uint8Array(estimatedContentLength);
+    var trailingChunks = [];
+    var receivedLength = 0;
+    var trailingChunksStart = 0;
 
+    if (!lengthComputable) {
+      console.warn("[UnityCache] Response is served without Content-Length header. Please reconfigure server to include valid Content-Length for better download performance.");
+    }
+
+    function readBody() {
+      if (typeof reader === "undefined") {
+        // Browser does not support streaming reader API
+        // Fallback to Respone.arrayBuffer()
+        return response.arrayBuffer().then(function (buffer) {
+          onProgress({
+            type: "progress",
+            total: buffer.length,
+            loaded: 0,
+            lengthComputable: lengthComputable
+          });
+          
+          return new Uint8Array(buffer);
+        });
+      }
+      
+      // Start reading memory chunks
+      return reader.read().then(function (result) {
+        if (result.done) {
+          return concatenateTrailingChunks();
+        }
+
+        if ((receivedLength + result.value.length) <= body.length) {
+          // Directly append chunk to body if enough memory was allocated
+          body.set(result.value, receivedLength);
+          trailingChunksStart = receivedLength + result.value.length;
+        } else {
+          // Store additional chunks in array to append later
+          trailingChunks.push(result.value);
+        }
+
+        receivedLength += result.value.length;
+        onProgress({
+          type: "progress",
+          total: Math.max(estimatedContentLength, receivedLength),
+          loaded: receivedLength,
+          lengthComputable: lengthComputable
+        });
+
+        return readBody();
+      });
+    }
+
+    function concatenateTrailingChunks() {
+      if (receivedLength === estimatedContentLength) {
+        return body;
+      }
+
+      if (receivedLength < estimatedContentLength) {
+        // Less data received than estimated, shrink body
+        return body.slice(0, receivedLength);
+      }
+
+      // More data received than estimated, create new larger body to prepend all additional chunks to the body
+      var newBody = new Uint8Array(receivedLength);
+      newBody.set(body, 0);
+      var position = trailingChunksStart;
+      for (var i = 0; i < trailingChunks.length; ++i) {
+        newBody.set(trailingChunks[i], position);
+        position += trailingChunks[i].length;
+      }
+
+      return newBody;
+    }
+
+    return readBody().then(function (parsedBody) {
+      onProgress({
+        type: "load",
+        total: parsedBody.length,
+        loaded: parsedBody.length,
+        lengthComputable: lengthComputable
+      });
+
+      response.parsedBody = parsedBody;
+      return response;
+    });
+  }
+
+  return readBodyWithProgress;
+}();
+
+Module.fetchWithProgress = function () {
   function fetchWithProgress(resource, init) {
     var onProgress = function () { };
     if (init && init.onProgress) {
@@ -404,183 +499,61 @@ Module.fetchWithProgress = function () {
     }
 
     return fetch(resource, init).then(function (response) {
-      var reader = (typeof response.body !== "undefined") ? response.body.getReader() : undefined;
-      var lengthComputable = typeof response.headers.get('Content-Length') !== "undefined";
-      var estimatedContentLength = estimateContentLength(response, lengthComputable);
-      var body = new Uint8Array(estimatedContentLength);
-      var trailingChunks = [];
-      var receivedLength = 0;
-      var trailingChunksStart = 0;
-
-      if (!lengthComputable) {
-        console.warn("[UnityCache] Response is served without Content-Length header. Please reconfigure server to include valid Content-Length for better download performance.");
-      }
-
-      function readBodyWithProgress() {
-        if (typeof reader === "undefined") {
-          // Browser does not support streaming reader API
-          // Fallback to Respone.arrayBuffer()
-          return response.arrayBuffer().then(function (buffer) {
-            onProgress({
-              type: "progress",
-              total: buffer.length,
-              loaded: 0,
-              lengthComputable: lengthComputable
-            });
-            
-            return new Uint8Array(buffer);
-          });
-        }
-        
-        // Start reading memory chunks
-        return reader.read().then(function (result) {
-          if (result.done) {
-            return concatenateTrailingChunks();
-          }
-
-          if ((receivedLength + result.value.length) <= body.length) {
-            // Directly append chunk to body if enough memory was allocated
-            body.set(result.value, receivedLength);
-            trailingChunksStart = receivedLength + result.value.length;
-          } else {
-            // Store additional chunks in array to append later
-            trailingChunks.push(result.value);
-          }
-
-          receivedLength += result.value.length;
-          onProgress({
-            type: "progress",
-            total: Math.max(estimatedContentLength, receivedLength),
-            loaded: receivedLength,
-            lengthComputable: lengthComputable
-          });
-
-          return readBodyWithProgress();
-        });
-      }
-
-      function concatenateTrailingChunks() {
-        if (receivedLength === estimatedContentLength) {
-          return body;
-        }
-
-        if (receivedLength < estimatedContentLength) {
-          // Less data received than estimated, shrink body
-          return body.slice(0, receivedLength);
-        }
-
-        // More data received than estimated, create new larger body to prepend all additional chunks to the body
-        var newBody = new Uint8Array(receivedLength);
-        newBody.set(body, 0);
-        var position = trailingChunksStart;
-        for (var i = 0; i < trailingChunks.length; ++i) {
-          newBody.set(trailingChunks[i], position);
-          position += trailingChunks[i].length;
-        }
-
-        return newBody;
-      }
-
-      return readBodyWithProgress().then(function (parsedBody) {
-        onProgress({
-          type: "load",
-          total: parsedBody.length,
-          loaded: parsedBody.length,
-          lengthComputable: lengthComputable
-        });
-
-        response.parsedBody = parsedBody;
-        return response;
-      });
+      return Module.readBodyWithProgress(response, onProgress);
     });
   }
 
   return fetchWithProgress;
 }();
-  Module.UnityCache = function () {
-  var UnityCacheDatabase = { name: "UnityCache", version: 3 };
+  /**
+ * @interface RequestMetaData
+ * An object with meta data for a request
+ * 
+ * @property {string} url The url of a request
+ * @property {string} company The company name
+ * @property {string} product The product name
+ * @property {number} version The version of the build
+ * @property {number} size The company of the build 
+ * @property {number} accessedAt Timestamp when request was last accessed (Unix timestamp format)
+ * @property {number} updatedAt Timestamp when request was last updated in the cache (Unix timestamp format)
+ */
+
+/**
+ * @interface ResponseWithMetaData
+ * An object with a cached response and meta data
+ * @property {Response} response
+ * @property {RequestMetaData} metaData
+ */
+
+Module.UnityCache = function () {
+  var UnityCacheDatabase = { name: "UnityCache", version: 4 };
+  var RequestMetaDataStore = { name: "RequestMetaDataStore", version: 1 };
   var RequestStore = { name: "RequestStore", version: 1 };
   var WebAssemblyStore = { name: "WebAssembly", version: 1 };
   var indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 
+  function log(message) {
+    console.log("[UnityCache] " + message);
+  }
+
   /**
    * A request cache that uses the browser Index DB to cache large requests
+   * @property {Promise<void>} isConnected
+   * @property {Cache} cache
    */
   function UnityCache() {
-    var cache = this;
+    var self = this;
 
-    function upgradeDatabase(e) {
-      var database = e.target.result;
-      if (!database.objectStoreNames.contains(WebAssemblyStore.name))
-        database.createObjectStore(WebAssemblyStore.name);
-
-      if (!database.objectStoreNames.contains(RequestStore.name)) {
-        var objectStore = database.createObjectStore(RequestStore.name, { keyPath: "url" });
-        ["version", "company", "product", "updated", "revalidated", "accessed"].forEach(function (index) { objectStore.createIndex(index, index); });
-      }
-    }
-
-    cache.isConnected = new Promise(function (resolve, reject) {
-      try {
-        // Workaround for WebKit bug 226547:
-        // On very first page load opening a connection to IndexedDB hangs without triggering onerror.
-        // Add a timeout that triggers the error handling code.
-        cache.openDBTimeout = setTimeout(function () {
-          if (typeof cache.database != "undefined")
-            return;
-
-          reject(new Error("Could not connect to database: Timeout."));
-        }, 2000);
-
-        function clearOpenDBTimeout() {
-          if (!cache.openDBTimeout) {
-            return;
-          }
-
-          clearTimeout(cache.openDBTimeout);
-          cache.openDBTimeout = null;
-        }
-
-        var openRequest = indexedDB.open(UnityCacheDatabase.name, UnityCacheDatabase.version);
-
-        openRequest.onupgradeneeded = function (e) {
-          upgradeDatabase(e);
-        };
-
-        openRequest.onsuccess = function (e) {
-          clearOpenDBTimeout();
-          cache.database = e.target.result;
-          resolve();
-        };
-
-        openRequest.onerror = function (error) {
-          clearOpenDBTimeout();
-          cache.database = null;
-          reject(new Error("Could not connect to database."));
-        };
-      } catch (error) {
-        clearOpenDBTimeout();
-        cache.database = null;
-        reject(new Error("Could not connect to database."));
-      }
+    this.isConnected = this.connect().then(function () {
+      return self.cleanUpCache();
     });
-  };
 
-  /**
-   * Name and version of unity cache database
-   */
-  UnityCache.UnityCacheDatabase = UnityCacheDatabase;
-  /**
-   * Name and version of request store database
-   */
-  UnityCache.RequestStore = RequestStore;
-  /**
-   * Name and version of web assembly store database
-   */
-  UnityCache.WebAssemblyStore = WebAssemblyStore;
+    this.isConnected.catch(function (error) {
+      log("Error when initializing cache: " + error);
+    });
+  }
 
   var instance = null;
-
   /**
    * Singleton accessor. Returns unity cache instance
    * @returns {UnityCache}
@@ -612,31 +585,217 @@ Module.fetchWithProgress = function () {
    * Clear the unity cache. 
    * @returns {Promise<void>} A promise that resolves when the cache is cleared.
    */
-  UnityCache.clearCache = function () {
-    return UnityCache.destroyInstance().then(function () {
-      return new Promise(function (resolve, reject) {
-        var request = indexedDB.deleteDatabase(UnityCacheDatabase.name);
-        request.onsuccess = function () {
-          resolve();
-        }
-        request.onerror = function () {
-          reject(new Error("Could not delete database."));
-        }
-        request.onblocked = function () {
-          reject(new Error("Database blocked."));
-        }
+  UnityCache.prototype.clearCache = function () {
+    var self = this;
+
+    function deleteCacheEntries(cacheKeys) {
+      if (cacheKeys.length === 0) {
+        return Promise.resolve();
+      }
+
+      var key = cacheKeys.pop();
+
+      return self.cache.delete(key).then(function () {
+        return deleteCacheEntries(cacheKeys);
       });
+    }
+
+    return this.isConnected.then(function () {
+      return self.execute(RequestMetaDataStore.name, "clear", []);
+    }).then(function () {
+      return self.cache.keys();
+    }).then(function (keys) {
+      return deleteCacheEntries(keys)
     });
   }
 
   /**
+   * Config for request meta data store
+   */
+  UnityCache.UnityCacheDatabase = UnityCacheDatabase;
+  UnityCache.RequestMetaDataStore = RequestMetaDataStore;
+  UnityCache.MaximumCacheSize = 1024 * 1024 * 1024; // 1 GB
+
+  /**
+   * Load a request response from cache
+   * @param {Request|string} request The fetch request
+   * @returns {Promise<ResponseWithMetaData|undefined>} A cached response with meta data for the request or undefined if request is not in cache.
+   */
+  UnityCache.prototype.loadRequest = function (request) {
+    var self = this;
+
+    return self.isConnected.then(function () {
+      return Promise.all([
+        self.cache.match(request),
+        self.loadRequestMetaData(request)
+      ]);
+    }).then(function (result) {
+      if (typeof result[0] === "undefined" || typeof result[1] === "undefined") {
+        return undefined;
+      }
+
+      return {
+        response: result[0],
+        metaData: result[1]
+      };
+    });
+  }
+
+  /**
+   * Load a request meta data from cache
+   * @param {Request|string} request The fetch request
+   * @returns {Promise<RequestMetaData>} Request meta data
+   */
+  UnityCache.prototype.loadRequestMetaData = function (request) {
+    var url = typeof request === "string" ? request : request.url;
+
+    return this.execute(RequestMetaDataStore.name, "get", [url]);
+  }
+
+  /**
+   * Update meta data of a request
+   * @param {RequestMetaData} metaData
+   * @returns {Promise<void>}
+   */
+  UnityCache.prototype.updateRequestMetaData = function (metaData) {
+    return this.execute(RequestMetaDataStore.name, "put", [metaData]);
+  }
+
+  /**
+   * Store request in cache
+   * @param {Request} request 
+   * @param {Response} response 
+   * @returns {Promise<void>}
+   */
+  UnityCache.prototype.storeRequest = function (request, response) {
+    var self = this;
+
+    return self.isConnected.then(function () {
+      return self.cache.put(request, response);
+    });
+  }
+
+  /**
+   * Close database and cache connection.
+   * @async
+   */
+   UnityCache.prototype.close = function () {
+    return this.isConnected.then(function () {
+      if (this.database) {
+        this.database.close();
+        this.database = null;
+      }
+
+      if (this.cache) {
+        this.cache = null;
+      }
+
+    }.bind(this));
+  }
+
+
+  /**
+   * Create a connection to Cache and IndexedDB for meta data storage
+   * @private
+   * @async
+   * @returns {Promise<void>} A Promise that is resolved when a connection to the IndexedDB and cache are established.
+   */
+  UnityCache.prototype.connect = function () {
+    var self = this;
+
+    if (typeof indexedDB === "undefined") {
+      return Promise.reject(new Error("Could not connect to cache: IndexedDB is not supported."));
+    }
+
+    if (typeof window.caches === "undefined") {
+      return Promise.reject(new Error("Could not connect to cache: Cache API is not supported."));
+    }
+
+    var isConnected = new Promise(function (resolve, reject) {
+      try {
+        // Workaround for WebKit bug 226547:
+        // On very first page load opening a connection to IndexedDB hangs without triggering onerror.
+        // Add a timeout that triggers the error handling code.
+        self.openDBTimeout = setTimeout(function () {
+          if (typeof self.database != "undefined") {
+            return;
+          }
+
+          reject(new Error("Could not connect to cache: Database timeout."));
+        }, 20000);
+
+        function clearOpenDBTimeout() {
+          if (!self.openDBTimeout) {
+            return;
+          }
+
+          clearTimeout(self.openDBTimeout);
+          self.openDBTimeout = null;
+        }
+
+        var openRequest = indexedDB.open(UnityCacheDatabase.name, UnityCacheDatabase.version);
+
+        openRequest.onupgradeneeded =  self.upgradeDatabase.bind(self);
+
+        openRequest.onsuccess = function (e) {
+          clearOpenDBTimeout();
+          self.database = e.target.result;
+          resolve();
+        };
+
+        openRequest.onerror = function (error) {
+          clearOpenDBTimeout();
+          self.database = null;
+          reject(new Error("Could not connect to database."));
+        };
+      } catch (error) {
+        clearOpenDBTimeout();
+        self.database = null;
+        self.cache = null;
+        reject(new Error("Could not connect to cache: Could not connect to database."));
+      }
+    }).then(function () {
+      var cacheName = UnityCacheDatabase.name + "_" + Module.companyName + "_" + Module.productName;
+      
+      return caches.open(cacheName);
+    }).then(function (cache) {
+      self.cache = cache;
+    });
+
+    return isConnected;
+  }
+
+  /**
+   * Upgrade object store if database is outdated
+   * @private
+   * @param {any} e Database upgrade event
+   */
+  UnityCache.prototype.upgradeDatabase = function (e) {
+    var database = e.target.result;
+
+    if (!database.objectStoreNames.contains(RequestMetaDataStore.name)) {
+      var objectStore = database.createObjectStore(RequestMetaDataStore.name, { keyPath: "url" });
+      ["accessedAt", "updatedAt"].forEach(function (index) { objectStore.createIndex(index, index); });
+    }
+
+    if (database.objectStoreNames.contains(RequestStore.name)) {
+      database.deleteObjectStore(RequestStore.name);
+    }
+
+    if (database.objectStoreNames.contains(WebAssemblyStore.name)) {
+      database.deleteObjectStore(WebAssemblyStore.name);
+    }
+  }
+
+  /**
    * Execute an operation on the cache
+   * @private
    * @param {string} store The name of the store to use
    * @param {string} operation The operation to to execute on the cache
    * @param {Array} parameters Parameters for the operation
    * @returns {Promise} A promise to the cache entry
    */
-  UnityCache.prototype.execute = function (store, operation, parameters) {
+   UnityCache.prototype.execute = function (store, operation, parameters) {
     return this.isConnected.then(function () {
       return new Promise(function (resolve, reject) {
         try {
@@ -668,46 +827,114 @@ Module.fetchWithProgress = function () {
         }
       }.bind(this));
     }.bind(this));
-  };
+  }
 
-  /**
-   * Load a request from the cache.
-   * @param {string} url The url of the request 
-   * @returns {Promise<Object>} A promise that resolves to the cached result or null if request is not in cache.
-   */
-  UnityCache.prototype.loadRequest = function (url) {
-    return this.execute(RequestStore.name, "get", [url]);
+  UnityCache.prototype.getMetaDataEntries = function () {
+    var self = this;
+    var cacheSize = 0;
+    var metaDataEntries = [];
+
+    return new Promise(function (resolve, reject) {
+      var transaction = self.database.transaction([RequestMetaDataStore.name], "readonly");
+      var target = transaction.objectStore(RequestMetaDataStore.name);
+      var request = target.openCursor();
+
+      request.onsuccess = function (event) {
+        var cursor = event.target.result;
+
+        if (cursor) {
+          cacheSize += cursor.value.size;
+          metaDataEntries.push(cursor.value);
+
+          cursor.continue();
+        } else {
+          resolve({
+            metaDataEntries: metaDataEntries,
+            cacheSize: cacheSize
+          });
+        }
+      };
+      request.onerror = function (error) {
+        reject(error);
+      };
+    });
   }
 
   /**
-   * Store a request in the cache
-   * @param {Object} request The request to store
-   * @returns {Promise<void>} A promise that resolves when the request is stored in the cache.
+   * Clean up cache by removing outdated entries.
+   * @private
+   * @returns {Promise<void>}
    */
-  UnityCache.prototype.storeRequest = function (request) {
-    return this.execute(RequestStore.name, "put", [request]);
-  }
+  UnityCache.prototype.cleanUpCache = function () {
+    var self = this;
 
-  /**
-   * Close database connection.
-   */
-  UnityCache.prototype.close = function () {
-    return this.isConnected.then(function () {
-      if (!this.database) {
-        return;
+    return this.getMetaDataEntries().then(function (result) {
+      var metaDataEntries = result.metaDataEntries;
+      var cacheSize = result.cacheSize;
+      var entriesToDelete = [];
+      var newMetaDataEntries = [];
+
+      // Remove cached entries with outdated product version
+      for (var i = 0; i < metaDataEntries.length; ++i) {
+        if (metaDataEntries[i].version == Module.productVersion) {
+          newMetaDataEntries.push(metaDataEntries[i]);
+          continue;
+        }
+
+        entriesToDelete.push(metaDataEntries[i]);
+        cacheSize -= metaDataEntries[i].size;
       }
 
-      this.database.close();
-      this.database = null;
-    }.bind(this));
+      // Remove cache entries until cache size limit is met
+      newMetaDataEntries.sort(function (a,b) {
+        return a.accessedAt - b.accessedAt;
+      });
+
+      for (var i = 0; i < newMetaDataEntries.length; ++i) {
+        if (cacheSize < UnityCache.MaximumCacheSize) {
+          break;
+        }
+
+        entriesToDelete.push(newMetaDataEntries[i]);
+        cacheSize -= newMetaDataEntries[i].size;
+      }
+
+      function deleteMetaDataEntry(url) {
+        return new Promise(function (resolve, reject) {
+          var transaction = self.database.transaction([RequestMetaDataStore.name], "readwrite");
+          var target = transaction.objectStore(RequestMetaDataStore.name);
+          target.delete(url);
+
+          transaction.oncomplete = resolve;
+          transaction.onerror = reject;
+        });
+      }
+
+      function deleteEntries() {
+        if (entriesToDelete.length === 0) {
+          return Promise.resolve();
+        }
+
+        var entryToDelete = entriesToDelete.pop();
+        return self.cache.delete(entryToDelete.url).then(function (deleted) {
+          if (deleted) {
+            return deleteMetaDataEntry(entryToDelete.url);
+          }
+        }).then(function () {
+          return deleteEntries();
+        });
+      }
+
+      return deleteEntries();
+    });
   }
 
   return UnityCache;
 }();
   Module.cachedFetch = function () {
   var UnityCache = Module.UnityCache;
-  var RequestStore = UnityCache.RequestStore;
   var fetchWithProgress = Module.fetchWithProgress;
+  var readBodyWithProgress = Module.readBodyWithProgress;
 
   function log(message) {
     console.log("[UnityCache] " + message);
@@ -722,95 +949,6 @@ Module.fetchWithProgress = function () {
   function isCrossOriginURL(url) {
     var originMatch = window.location.href.match(/^[a-z]+:\/\/[^\/]+/);
     return !originMatch || url.lastIndexOf(originMatch[0], 0);
-  }
-
-  /**
-   * A response restored from the unity cache.
-   * Implements the same interface as a fetch API Response
-   */
-  function CachedResponse(options) {
-    options = options || {};
-    this.headers = new Headers();
-    Object.keys(options.headers).forEach(function (key) {
-      this.headers.set(key, options.headers[key]);
-    }.bind(this));
-    this.redirected = options.redirected;
-    this.status = options.status;
-    this.statusText = options.statusText;
-    this.type = options.type;
-    this.url = options.url;
-    this.parsedBody = options.parsedBody;
-
-    Object.defineProperty(this, "ok", {
-      get: function () {
-        return this.status >= 200 && this.status <= 299;
-      }.bind(this)
-    });
-  }
-
-  /**
-   * Takes a Response stream and reads it to completion. It returns a promise that resolves with an ArrayBuffer.
-   * @returns {Promise<ArrayBuffer>}
-   */
-  CachedResponse.prototype.arrayBuffer = function () {
-    return Promise.resolve(this.parsedBody.buffer);
-  }
-
-  /**
-   * Takes a Response stream and reads it to completion. It returns a promise that resolves with a Blob.
-   * @returns {Promise<Blob>}
-   */
-  CachedResponse.prototype.blob = function () {
-    return this.arrayBuffer().then(function (buffer) {
-      return new Blob([buffer]);
-    });
-  }
-  
-  // TODO: Implement Body.formData()
-  // Takes a Response stream and reads it to completion. It returns a promise that resolves with a FormData object.
-  
-  /**
-   * Takes a Response stream and reads it to completion. It returns a promise that resolves with the result of parsing the body text as JSON, which is a JavaScript value of datatype object, string, etc.
-   * @returns {Promise<Object>}
-   */
-  CachedResponse.prototype.json = function () {
-    return this.text().then(function (text) {
-      return JSON.parse(text);
-    });
-  }
-  
-  /**
-   * Takes a Response stream and reads it to completion. It returns a promise that resolves with a USVString (text).
-   * @returns {Promise<string>}
-   */
-  CachedResponse.prototype.text = function () {
-    var utf8decoder = new TextDecoder();
-
-    return Promise.resolve(utf8decoder.decode(this.parsedBody));
-  }
-
-  function createCacheEntry(url, company, product, timestamp, response) {
-    var cacheEntry = {
-      url: url,
-      version: RequestStore.version,
-      company: company,
-      product: product, 
-      updated: timestamp,
-      revalidated: timestamp,
-      accessed: timestamp,
-      response: {
-        headers: {}
-      }
-    };
-
-    if (response) {
-      response.headers.forEach(function (value, key) {
-        cacheEntry.response.headers[key] = value; 
-      });
-      ["redirected", "status", "statusText", "type", "url"].forEach(function (property) { cacheEntry.response[property] = response[property]; });
-      cacheEntry.response.parsedBody = response.parsedBody;
-    }
-    return cacheEntry;
   }
 
   function isCacheEnabled(url, init) {
@@ -835,70 +973,63 @@ Module.fetchWithProgress = function () {
     var cache = { enabled: isCacheEnabled(url, init) };
     if (init) {
       cache.control = init.control;
-      cache.company = init.company;
-      cache.product = init.product;
+      cache.companyName = init.companyName;
+      cache.productName = init.productName;
+      cache.productVersion = init.productVersion;
     }
-    cache.result = createCacheEntry(url, cache.company, cache.product, Date.now());
     cache.revalidated = false;
+    cache.metaData = {
+      url: url,
+      accessedAt: Date.now(),
+      version: cache.productVersion
+    };
+    cache.response = null;
 
     function fetchAndStoreInCache(resource, init) {
-      return fetchWithProgress(resource, init).then(function (response) {
+      return fetch(resource, init).then(function (response) {
         if (!cache.enabled || cache.revalidated) {
           return response;
         }
 
         if (response.status === 304) {
           // Cached response is still valid. Set revalidated flag and return cached response
-          cache.result.revalidated = cache.result.accessed;
           cache.revalidated = true;
 
-          unityCache.storeRequest(cache.result).then(function () {
-            log("'" + cache.result.url + "' successfully revalidated and served from the indexedDB cache");
+          unityCache.updateRequestMetaData(cache.metaData).then(function () {
+            log("'" + cache.metaData.url + "' successfully revalidated and served from the indexedDB cache");
           }).catch(function (error) {
-            log("'" + cache.result.url + "' successfully revalidated but not stored in the indexedDB cache due to the error: " + error);
+            log("'" + cache.metaData.url + "' successfully revalidated but not stored in the indexedDB cache due to the error: " + error);
           });
 
-          return new CachedResponse(cache.result.response);
+          return readBodyWithProgress(cache.response, init.onProgress);
         } else if (response.status == 200) {
           // New response -> Store it and cache and return it
-          cache.result = createCacheEntry(
-            response.url,
-            cache.company,
-            cache.product,
-            cache.accessed,
-            response
-          );
+          cache.response = response;
+          cache.metaData.updatedAt = cache.metaData.accessedAt;
           cache.revalidated = true;
+          var clonedResponse = response.clone();
 
-          unityCache.storeRequest(cache.result).then(function () {
-            log("'" + cache.result.url + "' successfully downloaded and stored in the indexedDB cache");
-          }).catch(function (error) {
-            log("'" + cache.result.url + "' successfully downloaded but not stored in the indexedDB cache due to the error: " + error);
+          return readBodyWithProgress(response, init.onProgress).then(function (response) {
+            // Update cached request and meta data
+            cache.metaData.size = response.parsedBody.length;
+            Promise.all([
+              unityCache.storeRequest(resource, clonedResponse),
+              unityCache.updateRequestMetaData(cache.metaData)
+            ]).then(function () {
+              log("'" + url + "' successfully downloaded and stored in the indexedDB cache");
+            }).catch(function (error) {
+              log("'" + url + "' successfully downloaded but not stored in the indexedDB cache due to the error: " + error);
+            });
+
+            return response;
           });
         } else {
           // Request failed
-          log("'" + cache.result.url + "' request failed with status: " + response.status + " " + response.statusText);
+          log("'" + url + "' request failed with status: " + response.status + " " + response.statusText);
         }
 
-        return response;
+        return readBodyWithProgress(response, init.onProgress);
       });
-    }
-
-    function sendProgressEvents(response) {
-      if (init && init.onProgress) {
-        init.onProgress({
-          type: "progress",
-          total: response.parsedBody.length,
-          loaded: response.parsedBody.length,
-          lengthComputable: true
-        });
-        init.onProgress({
-          type: "load",
-          total: response.parsedBody.length,
-          loaded: response.parsedBody.length,
-          lengthComputable: true
-        });
-      }
     }
 
     // Use fetch directly if request can't be cached
@@ -906,35 +1037,36 @@ Module.fetchWithProgress = function () {
       return fetchWithProgress(resource, init);
     }
 
-    return unityCache.loadRequest(cache.result.url).then(function (result) {
-      // Fetch resource and store it in cache if not present or cache is outdated
-      if (!result || result.version !== RequestStore.version) {
+    return unityCache.loadRequest(url).then(function (result) {
+      // Fetch resource and store it in cache if not present or outdated version
+      if (!result) {
         return fetchAndStoreInCache(resource, init);
       }
 
-      cache.result = result;
-      cache.result.accessed = Date.now();
-      var response = new CachedResponse(cache.result.response);
+      var response = result.response;
+      var metaData = result.metaData;
+      cache.response = response;
+      cache.metaData.size = metaData.size;
+      cache.metaData.updatedAt = metaData.updatedAt;
       
       if (cache.control == "immutable") {
         cache.revalidated = true;
-        unityCache.storeRequest(cache.result);
-        log("'" + cache.result.url + "' served from the indexedDB cache without revalidation");
-        sendProgressEvents(response);
+        unityCache.updateRequestMetaData(metaData).then(function () {
+          log("'" + cache.metaData.url + "' served from the indexedDB cache without revalidation");
+        });
 
-        return response;
-      } else if (isCrossOriginURL(cache.result.url) && (response.headers.get("Last-Modified") || response.headers.get("ETag"))) {
-        return fetch(cache.result.url, { method: "HEAD" }).then(function (headResult) {
+        return readBodyWithProgress(response, init.onProgress);
+      } else if (isCrossOriginURL(url) && (response.headers.get("Last-Modified") || response.headers.get("ETag"))) {
+        return fetch(url, { method: "HEAD" }).then(function (headResult) {
           cache.revalidated = ["Last-Modified", "ETag"].every(function (header) {
             return !response.headers.get(header) || response.headers.get(header) == headResult.headers.get(header);
           });
           if (cache.revalidated) {
-            cache.result.revalidated = cache.result.accessed;
-            unityCache.storeRequest(cache.result);
-            log("'" + cache.result.url + "' successfully revalidated and served from the indexedDB cache");
-            sendProgressEvents(response);
-            
-            return response;
+            unityCache.updateRequestMetaData(metaData).then(function () {
+              log("'" + cache.metaData.url  + "' successfully revalidated and served from the indexedDB cache");
+            });
+
+            return readBodyWithProgress(cache.response, init.onProgress);
           } else {
             return fetchAndStoreInCache(resource, init);
           }
@@ -955,7 +1087,7 @@ Module.fetchWithProgress = function () {
       }
     }).catch(function (error) {
       // Fallback to regular fetch if and IndexDB error occurs
-      log("Failed to load '" + cache.result.url + "' from indexedDB cache due to the error: " + error);
+      log("Failed to load '" + cache.metaData.url  + "' from indexedDB cache due to the error: " + error);
       return fetchWithProgress(resource, init);
     });
   }
@@ -975,6 +1107,7 @@ Module.fetchWithProgress = function () {
         method: "GET",
         companyName: Module.companyName,
         productName: Module.productName,
+        productVersion: Module.productVersion,
         control: cacheControl,
         mode: mode,
         onProgress: function (event) {
