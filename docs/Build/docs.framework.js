@@ -9459,7 +9459,8 @@ function _emscripten_resize_heap(requestedSize) {
   return false;
  }
  for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
-  var overGrownHeapSize = oldSize + 16777216 / cutDown;
+  var overGrownHeapSize = oldSize * (1 + .2 / cutDown);
+  overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296);
   var newSize = Math.min(maxHeapSize, alignUp(Math.max(requestedSize, overGrownHeapSize), 65536));
   var replacement = emscripten_realloc_buffer(newSize);
   if (replacement) {
@@ -16023,6 +16024,10 @@ if (!Object.getOwnPropertyDescriptor(Module, "jsDomCssEscapeId")) Module["jsDomC
  abort("'jsDomCssEscapeId' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the FAQ)");
 };
 
+if (!Object.getOwnPropertyDescriptor(Module, "IDBFS")) Module["IDBFS"] = function() {
+ abort("'IDBFS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the FAQ)");
+};
+
 if (!Object.getOwnPropertyDescriptor(Module, "videoInstances")) Module["videoInstances"] = function() {
  abort("'videoInstances' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the FAQ)");
 };
@@ -16065,10 +16070,6 @@ if (!Object.getOwnPropertyDescriptor(Module, "jsSupportedVideoFormats")) Module[
 
 if (!Object.getOwnPropertyDescriptor(Module, "jsUnsupportedVideoFormats")) Module["jsUnsupportedVideoFormats"] = function() {
  abort("'jsUnsupportedVideoFormats' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the FAQ)");
-};
-
-if (!Object.getOwnPropertyDescriptor(Module, "IDBFS")) Module["IDBFS"] = function() {
- abort("'IDBFS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the FAQ)");
 };
 
 if (!Object.getOwnPropertyDescriptor(Module, "activeWebCams")) Module["activeWebCams"] = function() {
