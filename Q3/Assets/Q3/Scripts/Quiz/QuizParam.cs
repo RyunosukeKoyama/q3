@@ -11,7 +11,7 @@ public class QuizParam
     private const string CHAPTER_KEY = "QuizChapter";
     public static readonly List<int> ChapterChoices = new List<int> { 0, 1, 2, 3, 4, 5, 6 };
 
-
+    private const string TREND_KEY = "QuizTrend";
 
     public static void SetQuantity(int quantity)
     {
@@ -35,5 +35,17 @@ public class QuizParam
     {
         var chapter = PlayerPrefs.GetInt(CHAPTER_KEY);
         return chapter == default ? ChapterChoices.First() : chapter;
+    }
+
+    public static void SetTrend(int trend)
+    {
+        PlayerPrefs.SetInt(TREND_KEY, trend);
+        PlayerPrefs.Save();
+    }
+
+    // 実質 isRandom?
+    public static bool GetTrend()
+    {
+        return PlayerPrefs.GetInt(TREND_KEY) == 0; //0=random, 1=sort
     }
 }

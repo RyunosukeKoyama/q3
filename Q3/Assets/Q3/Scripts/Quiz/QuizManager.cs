@@ -38,16 +38,21 @@ public class QuizManager : MonoBehaviour
         yield return coroutine;
 
         var allQuizzes = (List<Quiz>)ie.Current;
+        var chapter = QuizParam.GetChapter();
+        var isRandom = QuizParam.GetTrend();
+        var correctIds = QuizScore.GetCorrectIds(chapter);
+        var incorrectIds = QuizScore.GetIncorrectIds(chapter);
 
         selectedQuizzes = allQuizzes
-                            .Where(q =>
-                            {
-                                var chapter = QuizParam.GetChapter();
-                                return chapter == 0 || q.Chapter == chapter; // 0なら全て
-                            })
+                            .Where(q => chapter == 0 || q.Chapter == chapter)
                             .OrderBy(_ => Guid.NewGuid())
+                            .OrderBy(q => isRandom || incorrectIds.Contains(q.Id) ? -1 : correctIds.Contains(q.Id) ? 1 : 0)
                             .Take(QuizParam.GetQuantity())
                             .ToList();
+
+        Debug.Log(string.Join(',', correctIds));
+        Debug.Log(string.Join(',', incorrectIds));
+        Debug.Log(string.Join(',', selectedQuizzes.Select(q => q.Id)));
 
         remainingQuizzes = new List<Quiz>(selectedQuizzes);
 
@@ -92,6 +97,7 @@ public class QuizManager : MonoBehaviour
         else
         {
             ShowResult();
+            SaveScore();
         }
     }
 
@@ -128,6 +134,14 @@ public class QuizManager : MonoBehaviour
 
         var gui = resultParent.Find("CorrectCount").GetComponentInChildren<TextMeshProUGUI>();
         gui.text = $"正解数\n<mark><size=150>{selectedQuizzes.Count - incorrectQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
+    }
+
+    private void SaveScore()
+    {
+        var correctIds = selectedQuizzes.Except(incorrectQuizzes).Select(q => q.Id).ToList();
+        var incorrectIds = incorrectQuizzes.Select(q => q.Id).ToList();
+        QuizScore.SaveScore(QuizParam.GetChapter(), correctIds, incorrectIds);
+        Debug.Log(string.Join(',', correctIds) + " : " + string.Join(',', incorrectIds));
     }
 
     private void SetSection(string section)
