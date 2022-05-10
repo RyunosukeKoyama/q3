@@ -7,7 +7,7 @@ using UnityEngine;
 // クイズのスコア(不正解記録)
 public class QuizScore
 {
-    private const string QUIZ_TYPE_KEY = "JSTQBFL:";
+    private const string QUIZ_TYPE_KEY = "JSTQBAL:";
     private const string QUIZ_CORRECT_KEY = "CORRECT:";
     private const string QUIZ_INCORRECT_KEY = "INCORRECT:";
 
