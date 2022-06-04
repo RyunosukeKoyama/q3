@@ -39,12 +39,14 @@ public class QuizManager : MonoBehaviour
 
         var allQuizzes = (List<Quiz>)ie.Current;
         var chapter = QuizParam.GetChapter();
+        var selectedChapterQuizzes = allQuizzes.Where(q => chapter == 0 || q.Chapter == chapter);
+        QuizScore.SaveAllIds(chapter, selectedChapterQuizzes.Select(q => q.Id).ToList());
+
         var isRandom = QuizParam.GetTrend();
         var correctIds = QuizScore.GetCorrectIds(chapter);
         var incorrectIds = QuizScore.GetIncorrectIds(chapter);
 
-        selectedQuizzes = allQuizzes
-                            .Where(q => chapter == 0 || q.Chapter == chapter)
+        selectedQuizzes = selectedChapterQuizzes
                             .OrderBy(_ => Guid.NewGuid())
                             .OrderBy(q => isRandom || incorrectIds.Contains(q.Id) ? -1 : correctIds.Contains(q.Id) ? 1 : 0)
                             .Take(QuizParam.GetQuantity())

@@ -12,7 +12,7 @@ public class QuizChapterSelector : MonoBehaviour
         dropdown.ClearOptions();
         dropdown.AddOptions(QuizParam.ChapterChoices.ConvertAll(i =>
         {
-            return i == 0 ? "全て" : i.ToString();
+            return i == 0 ? "全章" : i.ToString();
         }));
         dropdown.value = QuizParam.ChapterChoices.IndexOf(QuizParam.GetChapter());
     }

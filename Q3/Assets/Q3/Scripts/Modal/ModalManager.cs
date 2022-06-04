@@ -6,6 +6,7 @@ public class ModalManager : MonoSingleton<ModalManager>
 {
     [SerializeField] private GameObject onlyMessagePrefab;
     [SerializeField] private GameObject withOkCancelPrefab;
+    [SerializeField] private GameObject withOkPrefab;
 
     public void DeleteModal()
     {
@@ -40,5 +41,14 @@ public class ModalManager : MonoSingleton<ModalManager>
         var gui = go.GetComponentInChildren<TextMeshProUGUI>();
 
         gui.text = message;
+    }
+
+    public IEnumerator GenerateOk(string message)
+    {
+        var go = Instantiate(withOkPrefab, transform);
+        var gui = go.GetComponentInChildren<TextMeshProUGUI>();
+
+        gui.text = message;
+        yield return null;
     }
 }
