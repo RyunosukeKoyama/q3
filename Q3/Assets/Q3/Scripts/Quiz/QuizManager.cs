@@ -37,7 +37,7 @@ public class QuizManager : MonoBehaviour
 
         yield return coroutine;
 
-        var allQuizzes = (List<Quiz>)ie.Current;
+        var allQuizzes = (List<Quiz>) ie.Current;
         var chapter = QuizParam.GetChapter();
         var selectedChapterQuizzes = allQuizzes.Where(q => chapter == 0 || q.Chapter == chapter);
         QuizScore.SaveAllIds(chapter, selectedChapterQuizzes.Select(q => q.Id).ToList());
@@ -121,7 +121,6 @@ public class QuizManager : MonoBehaviour
 
     private void ShowExplanation()
     {
-        choicesParent.gameObject.SetActive(false);
         explanationParent.gameObject.SetActive(true);
     }
 
@@ -164,10 +163,12 @@ public class QuizManager : MonoBehaviour
         explanationGUI.text = currentQuiz.Explanations[choiceNum];
     }
 
-    private void ClearChoices()
+    private void ClearChoices(Transform ignoreTransform = null)
     {
         foreach (Transform choice in choicesParent)
         {
+            if (ignoreTransform == choice) continue;
+
             Destroy(choice.gameObject);
         }
     }
@@ -199,15 +200,21 @@ public class QuizManager : MonoBehaviour
 
     private void ChooseChoice(int choiceNum)
     {
+        var chooseChoice = choicesParent.Find(choiceNum.ToString());
+        chooseChoice.GetComponent<Button>().onClick.RemoveAllListeners();
+        ClearChoices(chooseChoice);
+
         SetExplanation(choiceNum);
         ShowExplanation();
 
         if (currentQuiz.CorrectChoiceIndex == choiceNum)
         {
+            chooseChoice.GetComponent<Image>().color = new Color32(180, 255, 180, 255); // Green
             correctAnswer.SetActive(true);
         }
         else
         {
+            chooseChoice.GetComponent<Image>().color = new Color32(255, 180, 180, 255); // Red
             incorrectAnswer.SetActive(true);
             incorrectQuizzes.Add(currentQuiz);
         }
