@@ -1,12 +1,9 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 public class QuizScore
 {
-    private const string QUIZ_TYPE_KEY = "JSTQBFL:";
     private const string QUIZ_CORRECT_KEY = "CORRECT:";
     private const string QUIZ_INCORRECT_KEY = "INCORRECT:";
     private const string QUIZ_ALL_KEY = "ALL:";
@@ -47,17 +44,17 @@ public class QuizScore
 
     private static string CorrectChapterKey(int chapter)
     {
-        return QUIZ_TYPE_KEY + QUIZ_CORRECT_KEY + chapter.ToString();
+        return QuizParam.GetLevel() + ':' + QUIZ_CORRECT_KEY + chapter.ToString();
     }
 
     private static string IncorrectChapterKey(int chapter)
     {
-        return QUIZ_TYPE_KEY + QUIZ_INCORRECT_KEY + chapter.ToString();
+        return QuizParam.GetLevel() + ':' + QUIZ_INCORRECT_KEY + chapter.ToString();
     }
 
     private static string AllChapterKey(int chapter)
     {
-        return QUIZ_TYPE_KEY + QUIZ_ALL_KEY + chapter.ToString();
+        return QuizParam.GetLevel() + ':' + QUIZ_ALL_KEY + chapter.ToString();
     }
 
     private static List<int> StringToIntList(string str)

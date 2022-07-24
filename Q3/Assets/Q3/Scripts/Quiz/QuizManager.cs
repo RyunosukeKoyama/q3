@@ -8,6 +8,7 @@ using System.Collections;
 
 public class QuizManager : MonoBehaviour
 {
+    [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private Transform sectionParent;
     private TextMeshProUGUI sectionGUI;
     [SerializeField] private Transform questionParent;
@@ -29,10 +30,13 @@ public class QuizManager : MonoBehaviour
 
     private IEnumerator Start()
     {
+        var level = QuizParam.GetLevel();
+        levelText.text = level;
+
         StartCoroutine(ModalManager.I.GenerateLoading());
         Debug.Log("start");
 
-        var ie = MasterLoader.I.LoadQuizzes();
+        var ie = MasterLoader.I.LoadQuizzes(level);
         var coroutine = StartCoroutine(ie);
 
         yield return coroutine;
