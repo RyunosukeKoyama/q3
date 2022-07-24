@@ -191,13 +191,13 @@ public class QuizManager : MonoBehaviour
             choiceGameObject.name = i.ToString();
             var button = choiceGameObject.GetComponent<Button>();
             var tmpI = i;
-            button.onClick.AddListener(() => ChooceChoice(tmpI));
+            button.onClick.AddListener(() => ChooseChoice(tmpI));
             var gui = choiceGameObject.GetComponentInChildren<TextMeshProUGUI>();
             gui.text = choices[i];
         }
     }
 
-    private void ChooceChoice(int choiceNum)
+    private void ChooseChoice(int choiceNum)
     {
         SetExplanation(choiceNum);
         ShowExplanation();
