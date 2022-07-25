@@ -90,12 +90,12 @@ public class QuizManager : MonoBehaviour
         ClearChoices();
         GenerateChoices(currentQuiz.Choices);
         ShowChoices();
-
-        HideAnswer();
     }
 
     public void FinishQuiz()
     {
+        HideAnswer();
+
         if (remainingQuizzes.Count > 0)
         {
             StartQuiz();
@@ -130,6 +130,7 @@ public class QuizManager : MonoBehaviour
 
     private void ShowResult()
     {
+        choicesParent.gameObject.SetActive(false);
         sectionParent.gameObject.SetActive(false);
         questionParent.gameObject.SetActive(false);
         explanationParent.gameObject.SetActive(false);
