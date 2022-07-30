@@ -9,8 +9,9 @@ using System.Collections;
 public class QuizManager : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI levelText;
-    [SerializeField] private Transform sectionParent;
-    private TextMeshProUGUI sectionGUI;
+    [SerializeField] private Transform headerParent;
+    [SerializeField] private TextMeshProUGUI sectionGUI;
+    [SerializeField] private TextMeshProUGUI countGUI;
     [SerializeField] private Transform questionParent;
     private TextMeshProUGUI questionGUI;
     [SerializeField] private Transform choicesParent;
@@ -24,6 +25,7 @@ public class QuizManager : MonoBehaviour
 
 
     private List<Quiz> remainingQuizzes;
+    private int totalQuizzesCount;
     private Quiz currentQuiz;
     private List<Quiz> incorrectQuizzes = new List<Quiz>();
     private List<Quiz> selectedQuizzes;
@@ -61,6 +63,8 @@ public class QuizManager : MonoBehaviour
         Debug.Log(string.Join(',', selectedQuizzes.Select(q => q.Id)));
 
         remainingQuizzes = new List<Quiz>(selectedQuizzes);
+        totalQuizzesCount = remainingQuizzes.Count;
+        UpdateCount();
 
         StartQuiz();
 
@@ -72,6 +76,9 @@ public class QuizManager : MonoBehaviour
         HideResult();
 
         remainingQuizzes = onlyIncorrect ? new List<Quiz>(incorrectQuizzes) : new List<Quiz>(selectedQuizzes);
+        totalQuizzesCount = remainingQuizzes.Count;
+        UpdateCount();
+
         incorrectQuizzes.Clear();
 
         StartQuiz();
@@ -82,7 +89,8 @@ public class QuizManager : MonoBehaviour
         currentQuiz = remainingQuizzes.First();
 
         SetSection(currentQuiz.Section);
-        ShowSection();
+        ShowHeader();
+        UpdateCount();
 
         SetQuestion(currentQuiz.Question);
         ShowQuestion();
@@ -107,9 +115,9 @@ public class QuizManager : MonoBehaviour
         }
     }
 
-    private void ShowSection()
+    private void ShowHeader()
     {
-        sectionParent.gameObject.SetActive(true);
+        headerParent.gameObject.SetActive(true);
     }
 
     private void ShowQuestion()
@@ -131,7 +139,7 @@ public class QuizManager : MonoBehaviour
     private void ShowResult()
     {
         choicesParent.gameObject.SetActive(false);
-        sectionParent.gameObject.SetActive(false);
+        headerParent.gameObject.SetActive(false);
         questionParent.gameObject.SetActive(false);
         explanationParent.gameObject.SetActive(false);
         resultParent.gameObject.SetActive(true);
@@ -139,7 +147,12 @@ public class QuizManager : MonoBehaviour
         restartOnlyIncorrect.SetActive(isIncorrect);
 
         var gui = resultParent.Find("CorrectCount").GetComponentInChildren<TextMeshProUGUI>();
-        gui.text = $"正解数\n<mark><size=150>{selectedQuizzes.Count - incorrectQuizzes.Count}/{selectedQuizzes.Count} </size></mark>";
+        gui.text = $"正解数\n<mark><size=150>{selectedQuizzes.Count - incorrectQuizzes.Count}/{totalQuizzesCount} </size></mark>";
+    }
+
+    private void UpdateCount()
+    {
+        countGUI.text = $"{totalQuizzesCount - remainingQuizzes.Count + 1}/{totalQuizzesCount}";
     }
 
     private void SaveScore()
@@ -152,7 +165,7 @@ public class QuizManager : MonoBehaviour
 
     private void SetSection(string section)
     {
-        sectionGUI ??= sectionParent.GetComponentInChildren<TextMeshProUGUI>();
+        sectionGUI ??= headerParent.GetComponentInChildren<TextMeshProUGUI>();
         sectionGUI.text = section;
     }
 
