@@ -8,7 +8,6 @@ using System.Collections;
 
 public class QuizManager : MonoBehaviour
 {
-    [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private Transform headerParent;
     [SerializeField] private TextMeshProUGUI sectionGUI;
     [SerializeField] private TextMeshProUGUI countGUI;
@@ -29,11 +28,11 @@ public class QuizManager : MonoBehaviour
     private Quiz currentQuiz;
     private List<Quiz> incorrectQuizzes = new List<Quiz>();
     private List<Quiz> selectedQuizzes;
+    private string level;
 
     private IEnumerator Start()
     {
-        var level = QuizParam.GetLevel();
-        levelText.text = level;
+        level = QuizParam.GetLevel();
 
         StartCoroutine(ModalManager.I.GenerateLoading());
         Debug.Log("start");
@@ -88,7 +87,7 @@ public class QuizManager : MonoBehaviour
     {
         currentQuiz = remainingQuizzes.First();
 
-        SetSection(currentQuiz.Section);
+        SetSection(level);
         ShowHeader();
         UpdateCount();
 
@@ -222,6 +221,7 @@ public class QuizManager : MonoBehaviour
         chooseChoice.GetComponent<Button>().onClick.RemoveAllListeners();
         ClearChoices(chooseChoice);
 
+        SetSection(currentQuiz.Section);
         SetExplanation(choiceNum);
         ShowExplanation();
 
