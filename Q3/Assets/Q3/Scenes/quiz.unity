@@ -392,6 +392,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f96aebe4ddc7492cb7f2558e091f828, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &258446000 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5357554654246722998, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
+  m_PrefabInstance: {fileID: 476953043}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &317427140
 GameObject:
   m_ObjectHideFlags: 0
@@ -643,9 +648,6 @@ PrefabInstance:
       addedObject: {fileID: 959367287347905005}
     - targetCorrespondingSourceObject: {fileID: 5357554654246722993, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 698563991}
-    - targetCorrespondingSourceObject: {fileID: 5357554654246722993, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 251249510}
     - targetCorrespondingSourceObject: {fileID: 5357554654246722993, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
       insertIndex: -1
@@ -665,13 +667,39 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5357554654246722993, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1970573461}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5357554654246722998, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 476953048}
   m_SourcePrefab: {fileID: 100100000, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
 --- !u!224 &476953044 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5357554654246722993, guid: 6d106727f26954ab8bef71f5bc8c6f52, type: 3}
   m_PrefabInstance: {fileID: 476953043}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &476953048
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 258446000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d73b9583d31a7485e94b570230806856, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  headerParent: {fileID: 734824402}
+  sectionGUI: {fileID: 1144989847}
+  countGUI: {fileID: 2099602118}
+  questionParent: {fileID: 1627716226}
+  choicesParent: {fileID: 2083231661}
+  choicePrefab: {fileID: 7536099687314880889, guid: ccfb9579be47f406dbc83c51970190b2, type: 3}
+  correctAnswer: {fileID: 786512389}
+  incorrectAnswer: {fileID: 567375197}
+  explanationParent: {fileID: 1911744110}
+  resultParent: {fileID: 1970573461}
+  restartOnlyIncorrect: {fileID: 1994785290}
 --- !u!1 &511228887
 GameObject:
   m_ObjectHideFlags: 0
@@ -1050,11 +1078,11 @@ Transform:
   m_GameObject: {fileID: 698563990}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 160, y: 160, z: 160}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 476953044}
-  m_RootOrder: 0
+  m_Father: {fileID: 0}
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &698563992
 MonoBehaviour:
@@ -1068,17 +1096,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56cfaf02f4bb442958a295d2b67ef6ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  headerParent: {fileID: 734824402}
-  sectionGUI: {fileID: 1144989847}
-  countGUI: {fileID: 2099602118}
-  questionParent: {fileID: 1627716226}
-  choicesParent: {fileID: 2083231661}
-  choicePrefab: {fileID: 7536099687314880889, guid: ccfb9579be47f406dbc83c51970190b2, type: 3}
-  correctAnswer: {fileID: 786512389}
-  incorrectAnswer: {fileID: 567375197}
-  explanationParent: {fileID: 1911744110}
-  resultParent: {fileID: 1970573461}
-  restartOnlyIncorrect: {fileID: 1994785290}
+  window: {fileID: 476953048}
 --- !u!1 &734824401
 GameObject:
   m_ObjectHideFlags: 0
@@ -3114,7 +3132,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 698563992}
         m_TargetAssemblyTypeName: QuizManager, Assembly-CSharp
-        m_MethodName: Restart
+        m_MethodName: StartQuiz
         m_Mode: 6
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
